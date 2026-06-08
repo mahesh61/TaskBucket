@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task Buckets</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#080b14;
+  --surface:#0f1525;
+  --card:#141b2e;
+  --card-hover:#182035;
+  --border:rgba(255,255,255,0.07);
+  --border-hover:rgba(255,255,255,0.15);
+  --text:#e2e8f0;
+  --muted:#64748b;
+  --muted2:#94a3b8;
+  --dev:#7c3aed;
+  --dev2:#a78bfa;
+  --dev-bg:rgba(124,58,237,0.12);
+  --bug:#dc2626;
+  --bug2:#f87171;
+  --bug-bg:rgba(220,38,38,0.12);
+  --patch:#059669;
+  --patch2:#34d399;
+  --patch-bg:rgba(5,150,105,0.12);
+  --radius:14px;
+  --radius-sm:8px;
+  --shadow:0 8px 32px rgba(0,0,0,0.5);
+  --shadow-sm:0 2px 12px rgba(0,0,0,0.3);
+}
+
+html{scroll-behavior:smooth}
+html::-webkit-scrollbar{display:none}
+html{-ms-overflow-style:none;scrollbar-width:none}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  padding:0 0 3rem;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(124,58,237,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 110%, rgba(5,150,105,0.06) 0%, transparent 60%);
+}
+
+/* ─── HEADER ─── */
+.app-header{
+  padding:.6rem 1.5rem;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);
+  position:sticky;top:0;z-index:100;
+  background:rgba(8,11,20,0.85);
+}
+.app-logo{display:flex;align-items:center;gap:.75rem}
+.logo-icon{
+  width:28px;height:28px;
+  background:linear-gradient(135deg,var(--dev),var(--bug));
+  border-radius:7px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.app-title{font-size:1rem;font-weight:700;letter-spacing:-.02em}
+.app-subtitle{font-size:.68rem;color:var(--muted);margin-top:0}
+.header-stats{
+  display:flex;gap:1.5rem;
+  font-size:.8rem;color:var(--muted);
+}
+.stat{display:flex;align-items:center;gap:.4rem}
+.stat-dot{width:7px;height:7px;border-radius:50%}
+
+/* ─── BOARD ─── */
+.board{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:1.5rem;
+  padding:1.75rem 2.5rem;
+  max-width:1440px;
+  margin:0 auto;
+}
+
+/* ─── BUCKET ─── */
+.bucket{
+  background:var(--surface);
+  border-radius:var(--radius);
+  border:1px solid var(--border);
+  display:flex;flex-direction:column;
+  min-height:520px;
+  overflow:hidden;
+  transition:border-color .2s;
+}
+.bucket.drag-active{border-color:rgba(255,255,255,.2)}
+
+.bucket-header{
+  padding:.5rem .875rem;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);
+}
+.bh-left{display:flex;align-items:center;gap:.625rem}
+.bucket-icon-wrap{
+  width:34px;height:34px;
+  border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.bucket[data-type="development"] .bucket-icon-wrap{background:var(--dev-bg)}
+.bucket[data-type="bugs"] .bucket-icon-wrap{background:var(--bug-bg)}
+.bucket[data-type="patches"] .bucket-icon-wrap{background:var(--patch-bg)}
+
+.bucket-name{font-weight:600;font-size:.9375rem;letter-spacing:-.01em}
+.bucket[data-type="development"] .bucket-name{color:var(--dev2)}
+.bucket[data-type="bugs"] .bucket-name{color:var(--bug2)}
+.bucket[data-type="patches"] .bucket-name{color:var(--patch2)}
+
+.bucket-count{
+  font-size:.7rem;font-weight:700;
+  padding:2px 9px;border-radius:99px;
+  letter-spacing:.03em;
+}
+.bucket[data-type="development"] .bucket-count{background:var(--dev-bg);color:var(--dev2)}
+.bucket[data-type="bugs"] .bucket-count{background:var(--bug-bg);color:var(--bug2)}
+.bucket[data-type="patches"] .bucket-count{background:var(--patch-bg);color:var(--patch2)}
+
+.bucket-accent{
+  height:2px;border-radius:0;margin:0;
+  background:linear-gradient(90deg,transparent,currentColor,transparent);
+}
+.bucket[data-type="development"] .bucket-accent{color:var(--dev);opacity:.6}
+.bucket[data-type="bugs"] .bucket-accent{color:var(--bug);opacity:.6}
+.bucket[data-type="patches"] .bucket-accent{color:var(--patch);opacity:.6}
+
+/* ─── TILE LIST ─── */
+.tiles-list{
+  flex:1;padding:.875rem;
+  display:flex;flex-direction:column;gap:.625rem;
+  overflow-y:auto;min-height:80px;
+}
+.tiles-list::-webkit-scrollbar{width:4px}
+.tiles-list::-webkit-scrollbar-track{background:transparent}
+.tiles-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px}
+
+/* ─── EMPTY STATE ─── */
+.empty-state{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:2rem 1rem;gap:.625rem;
+  color:var(--muted);opacity:.6;font-size:.8rem;text-align:center;
+}
+
+/* ─── TILE ─── */
+.tile{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:.875rem 1rem .875rem .875rem;
+  cursor:grab;
+  transition:background .15s,border-color .15s,transform .15s,box-shadow .15s;
+  position:relative;
+  user-select:none;
+}
+.tile::before{
+  content:'';position:absolute;left:0;top:8px;bottom:8px;
+  width:3px;border-radius:0 3px 3px 0;
+}
+.bucket[data-type="development"] .tile::before{background:var(--dev)}
+.bucket[data-type="bugs"] .tile::before{background:var(--bug)}
+.bucket[data-type="patches"] .tile::before{background:var(--patch)}
+
+.tile:hover{
+  background:var(--card-hover);
+  border-color:var(--border-hover);
+  box-shadow:var(--shadow-sm);
+}
+.tile:active,.tile.dragging{cursor:grabbing;opacity:.4;transform:scale(.98)}
+
+.tile-body{display:flex;align-items:flex-start;gap:.5rem}
+.tile-drag-handle{
+  flex-shrink:0;color:var(--muted);opacity:0;
+  transition:opacity .15s;margin-top:1px;
+  cursor:grab;
+}
+.tile:hover .tile-drag-handle{opacity:.5}
+
+.tile-content{flex:1;min-width:0}
+.tile-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem}
+
+.tile-link{
+  font-size:.875rem;font-weight:500;
+  color:var(--text);text-decoration:none;
+  line-height:1.4;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  display:block;
+}
+.tile-link:hover{color:#93c5fd;text-decoration:underline}
+
+.tile-actions{
+  display:flex;gap:2px;flex-shrink:0;
+  opacity:0;transition:opacity .15s;
+}
+.tile:hover .tile-actions{opacity:1}
+
+.btn-icon{
+  background:none;border:none;cursor:pointer;
+  padding:4px;border-radius:5px;
+  color:var(--muted);
+  transition:background .1s,color .1s;
+  display:flex;align-items:center;justify-content:center;
+  line-height:0;
+}
+.btn-icon:hover{background:rgba(255,255,255,.08);color:var(--text)}
+.btn-icon.del:hover{background:rgba(239,68,68,.15);color:#f87171}
+
+.tile-url{
+  font-size:.7rem;color:var(--muted);margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  display:flex;align-items:center;gap:4px;opacity:.7;
+}
+.tile-desc{
+  font-size:.75rem;color:var(--muted2);
+  margin-top:.3rem;line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+
+/* ─── DROP INDICATOR ─── */
+.drop-line{
+  height:2px;border-radius:2px;margin:2px 0;pointer-events:none;
+  flex-shrink:0;
+}
+.bucket[data-type="development"] .drop-line{background:var(--dev)}
+.bucket[data-type="bugs"] .drop-line{background:var(--bug)}
+.bucket[data-type="patches"] .drop-line{background:var(--patch)}
+
+/* ─── ADD BUTTON ─── */
+.btn-add-tile{
+  margin:.375rem .875rem .875rem;
+  padding:.6rem;
+  border-radius:var(--radius-sm);
+  border:1px dashed rgba(255,255,255,.1);
+  background:transparent;
+  color:var(--muted);font-size:.8rem;
+  cursor:pointer;font-family:inherit;
+  display:flex;align-items:center;justify-content:center;gap:.4rem;
+  transition:all .2s;
+}
+.btn-add-tile:hover{
+  background:rgba(255,255,255,.04);
+  color:var(--text);border-color:rgba(255,255,255,.2);
+}
+
+/* ─── MODAL ─── */
+.overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.75);
+  backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;
+  z-index:500;padding:1rem;
+  opacity:0;pointer-events:none;
+  transition:opacity .2s;
+}
+.overlay.open{opacity:1;pointer-events:all}
+
+.modal{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:1.75rem;
+  width:100%;max-width:460px;
+  box-shadow:var(--shadow);
+  transform:translateY(16px) scale(.98);
+  transition:transform .22s cubic-bezier(.34,1.56,.64,1);
+}
+.overlay.open .modal{transform:translateY(0) scale(1)}
+
+.modal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:1.5rem;
+}
+.modal-title{font-size:1.1rem;font-weight:600;display:flex;align-items:center;gap:.5rem}
+
+.btn-close{
+  background:rgba(255,255,255,.06);
+  border:none;cursor:pointer;
+  width:30px;height:30px;border-radius:7px;
+  color:var(--muted);
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.btn-close:hover{background:rgba(255,255,255,.1);color:var(--text)}
+
+.form-group{margin-bottom:1rem}
+.form-label{
+  display:block;font-size:.72rem;
+  color:var(--muted2);margin-bottom:.375rem;
+  font-weight:600;text-transform:uppercase;letter-spacing:.07em;
+}
+
+input[type=text],input[type=url],textarea,select{
+  width:100%;
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:.625rem .875rem;
+  color:var(--text);
+  font-size:.875rem;font-family:inherit;
+  outline:none;
+  transition:border-color .15s,box-shadow .15s;
+  -webkit-appearance:none;appearance:none;
+}
+input:focus,textarea:focus,select:focus{
+  border-color:rgba(124,58,237,.5);
+  box-shadow:0 0 0 3px rgba(124,58,237,.12);
+}
+textarea{resize:vertical;min-height:72px;max-height:160px}
+select{
+  cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right .75rem center;
+  padding-right:2rem;
+}
+select option{background:var(--surface)}
+
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:.875rem}
+
+.modal-footer{
+  display:flex;gap:.75rem;justify-content:flex-end;
+  margin-top:1.5rem;padding-top:1.25rem;
+  border-top:1px solid var(--border);
+}
+.btn{
+  padding:.575rem 1.25rem;
+  border-radius:var(--radius-sm);
+  border:none;font-size:.875rem;font-weight:500;
+  cursor:pointer;font-family:inherit;
+  transition:all .15s;display:inline-flex;align-items:center;gap:.4rem;
+}
+.btn-ghost{
+  background:rgba(255,255,255,.06);
+  color:var(--muted2);
+}
+.btn-ghost:hover{background:rgba(255,255,255,.1);color:var(--text)}
+.btn-primary{
+  background:linear-gradient(135deg,#7c3aed,#6d28d9);
+  color:#fff;
+}
+.btn-primary:hover{filter:brightness(1.12);box-shadow:0 4px 16px rgba(124,58,237,.4)}
+
+/* ─── CONFIRM DELETE INLINE ─── */
+.delete-confirm{
+  display:flex;align-items:center;gap:.5rem;
+  font-size:.78rem;padding:.25rem 0;
+  animation:fadeIn .15s ease-out;
+}
+.delete-confirm-msg{color:#f87171;flex:1;display:flex;align-items:center;gap:.375rem}
+.btn-confirm-y{
+  background:#ef4444;color:#fff;
+  border:none;cursor:pointer;font-family:inherit;
+  padding:3px 12px;border-radius:5px;font-size:.75rem;font-weight:500;
+  transition:filter .1s;
+}
+.btn-confirm-y:hover{filter:brightness(1.1)}
+.btn-confirm-n{
+  background:rgba(255,255,255,.07);color:var(--muted2);
+  border:none;cursor:pointer;font-family:inherit;
+  padding:3px 10px;border-radius:5px;font-size:.75rem;
+  transition:background .1s;
+}
+.btn-confirm-n:hover{background:rgba(255,255,255,.12)}
+
+/* ─── TOAST ─── */
+.toast-shelf{
+  position:fixed;bottom:1.5rem;right:1.5rem;
+  display:flex;flex-direction:column;gap:.5rem;z-index:9999;
+}
+.toast{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:.625rem 1rem;
+  font-size:.8375rem;
+  box-shadow:var(--shadow);
+  display:flex;align-items:center;gap:.5rem;
+  animation:toastIn .2s ease-out forwards,toastOut .25s 2.75s ease-in forwards;
+  pointer-events:none;
+}
+.toast.ok{border-left:3px solid var(--patch2)}
+.toast.err{border-left:3px solid var(--bug2)}
+
+@keyframes toastIn{from{transform:translateX(80px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes toastOut{to{transform:translateX(80px);opacity:0}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+@keyframes floatWave{
+  0%  {transform:translateY(0px) rotate(0deg)}
+  25% {transform:translateY(-5px) rotate(.4deg)}
+  50% {transform:translateY(-2px) rotate(0deg)}
+  75% {transform:translateY(-7px) rotate(-.4deg)}
+  100%{transform:translateY(0px) rotate(0deg)}
+}
+@keyframes tileIn{
+  from{opacity:0;transform:translateY(18px) scale(.96)}
+  to  {opacity:1;transform:translateY(0)    scale(1)}
+}
+
+.tile{
+  animation:tileIn .35s ease-out both, floatWave 5s ease-in-out infinite;
+}
+.tile:nth-child(1) {animation-delay:0s,   0s}
+.tile:nth-child(2) {animation-delay:.06s, .8s}
+.tile:nth-child(3) {animation-delay:.12s, 1.6s}
+.tile:nth-child(4) {animation-delay:.18s, 2.4s}
+.tile:nth-child(5) {animation-delay:.24s, 3.2s}
+.tile:nth-child(6) {animation-delay:.30s, 4.0s}
+.tile:nth-child(7) {animation-delay:.36s, 0.4s}
+.tile:nth-child(8) {animation-delay:.42s, 1.2s}
+
+.tile:hover{
+  animation:none;
+}
+
+/* ─── FLAGGED / WORKING TILE ─── */
+@keyframes pulseDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.75)}}
+
+.bucket[data-type="development"] .tile.flagged{background:rgba(124,58,237,.18);border-color:rgba(124,58,237,.45);box-shadow:0 0 18px rgba(124,58,237,.18),var(--shadow-sm)}
+.bucket[data-type="bugs"]        .tile.flagged{background:rgba(220,38,38,.18);border-color:rgba(220,38,38,.45);box-shadow:0 0 18px rgba(220,38,38,.18),var(--shadow-sm)}
+.bucket[data-type="patches"]     .tile.flagged{background:rgba(5,150,105,.18);border-color:rgba(5,150,105,.45);box-shadow:0 0 18px rgba(5,150,105,.18),var(--shadow-sm)}
+
+.tile-flag-badge{
+  display:none;
+  font-size:.58rem;font-weight:700;
+  padding:2px 8px;border-radius:99px;
+  letter-spacing:.06em;text-transform:uppercase;
+  flex-shrink:0;align-items:center;gap:4px;
+  white-space:nowrap;
+}
+.tile.flagged .tile-flag-badge{display:inline-flex}
+.tile-flag-badge .badge-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:currentColor;flex-shrink:0;
+  animation:pulseDot 1.4s ease-in-out infinite;
+}
+.bucket[data-type="development"] .tile.flagged .tile-flag-badge{background:var(--dev-bg);color:var(--dev2)}
+.bucket[data-type="bugs"]        .tile.flagged .tile-flag-badge{background:var(--bug-bg);color:var(--bug2)}
+.bucket[data-type="patches"]     .tile.flagged .tile-flag-badge{background:var(--patch-bg);color:var(--patch2)}
+
+.btn-icon.flag{opacity:.3;transition:opacity .15s,color .15s}
+.tile:hover .btn-icon.flag{opacity:.65}
+.tile.flagged .btn-icon.flag{opacity:1}
+.bucket[data-type="development"] .tile.flagged .btn-icon.flag{color:var(--dev2)}
+.bucket[data-type="bugs"]        .tile.flagged .btn-icon.flag{color:var(--bug2)}
+.bucket[data-type="patches"]     .tile.flagged .btn-icon.flag{color:var(--patch2)}
+
+/* ─── MOBILE TABS ─── */
+.mobile-tabs{display:none}
+
+/* ─── RESPONSIVE — tablet ─── */
+@media(max-width:960px){
+  .board{grid-template-columns:1fr;padding:1rem 1.25rem}
+  .header-stats{display:none}
+}
+
+/* ─── RESPONSIVE — mobile ─── */
+@media(max-width:600px){
+  /* header */
+  .app-header{padding:.45rem .875rem;gap:.5rem}
+  .app-subtitle{display:none}
+  .logo-icon{width:24px;height:24px;border-radius:6px}
+  .app-title{font-size:.875rem}
+
+  /* mobile tab bar */
+  .mobile-tabs{
+    display:flex;
+    position:sticky;top:39px;z-index:90;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+  }
+  .mobile-tab{
+    flex:1;padding:.5rem .25rem;
+    border:none;border-bottom:2px solid transparent;
+    background:none;color:var(--muted);
+    font-size:.7rem;font-weight:600;font-family:inherit;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:.3rem;
+    transition:color .2s,border-color .2s;
+    white-space:nowrap;-webkit-tap-highlight-color:transparent;
+  }
+  .mobile-tab[data-tab="development"].active{color:var(--dev2);border-color:var(--dev2)}
+  .mobile-tab[data-tab="bugs"].active       {color:var(--bug2);border-color:var(--bug2)}
+  .mobile-tab[data-tab="patches"].active    {color:var(--patch2);border-color:var(--patch2)}
+  .tab-count{
+    font-size:.58rem;padding:1px 5px;border-radius:99px;
+    background:rgba(255,255,255,.08);
+  }
+
+  /* board & buckets */
+  .board{
+    grid-template-columns:1fr;
+    padding:.625rem;gap:0;
+  }
+  .bucket{display:none;min-height:calc(100dvh - 95px);border-radius:var(--radius-sm)}
+  .bucket.tab-active{display:flex}
+
+  /* tiles */
+  .tile{padding:.7rem .875rem}
+  .btn-icon{padding:7px}
+  .tile-actions{opacity:1}
+  .tile-drag-handle{display:none}
+  .btn-add-tile{padding:.7rem;font-size:.8rem}
+
+  /* bottom-sheet modal */
+  .overlay{padding:0;align-items:flex-end}
+  .modal{
+    border-radius:18px 18px 0 0;
+    max-width:100%;width:100%;
+    max-height:92dvh;
+    overflow-y:auto;
+    padding:1.25rem 1rem 2rem;
+    transform:translateY(100%);
+  }
+  .overlay.open .modal{transform:translateY(0)}
+  .form-row{grid-template-columns:1fr}
+  textarea{min-height:60px}
+}
+</style>
+</head>
+<body>
+
+<!-- ─── HEADER ─── -->
+<header class="app-header">
+  <div class="app-logo">
+    <div class="logo-icon">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+        <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+        <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+        <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+      </svg>
+    </div>
+    <div>
+      <div class="app-title">Task Buckets</div>
+      <div class="app-subtitle">Drag · Drop · Organize</div>
+    </div>
+  </div>
+  <div class="header-stats" id="headerStats">
+    <div class="stat">
+      <div class="stat-dot" style="background:var(--dev2)"></div>
+      <span id="statDev">0 dev</span>
+    </div>
+    <div class="stat">
+      <div class="stat-dot" style="background:var(--bug2)"></div>
+      <span id="statBug">0 bugs</span>
+    </div>
+    <div class="stat">
+      <div class="stat-dot" style="background:var(--patch2)"></div>
+      <span id="statPatch">0 patches</span>
+    </div>
+  </div>
+</header>
+
+<!-- ─── MOBILE TABS ─── -->
+<div class="mobile-tabs" id="mobileTabs">
+  <button class="mobile-tab active" data-tab="development">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+    Dev <span class="tab-count" id="tabCount-development">0</span>
+  </button>
+  <button class="mobile-tab" data-tab="bugs">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="13" r="4"/><path d="M3 13h2M19 13h2M12 5V3M5 7l1.5 1.5M17.5 8.5L19 7"/></svg>
+    Bugs <span class="tab-count" id="tabCount-bugs">0</span>
+  </button>
+  <button class="mobile-tab" data-tab="patches">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+    Patches <span class="tab-count" id="tabCount-patches">0</span>
+  </button>
+</div>
+
+<!-- ─── BOARD ─── -->
+<div class="board" id="board"></div>
+
+<!-- ─── MODAL ─── -->
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="modalTitle">
+        <svg id="mIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--dev2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+        <span id="mHeading">Add Tile</span>
+      </div>
+      <button class="btn-close" id="closeBtn" aria-label="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="tileForm" novalidate>
+      <div class="form-group">
+        <label class="form-label" for="fTitle">Title</label>
+        <input type="text" id="fTitle" placeholder="e.g. Implement OAuth flow" autocomplete="off" required/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="fUrl">URL</label>
+        <input type="url" id="fUrl" placeholder="https://github.com/..." required/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="fDesc">Description <span style="text-transform:none;letter-spacing:0;opacity:.6">(optional)</span></label>
+        <textarea id="fDesc" placeholder="Short description…"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="fBucket">Bucket</label>
+        <select id="fBucket">
+          <option value="development">🟣  Development</option>
+          <option value="bugs">🔴  Bugs</option>
+          <option value="patches">🟢  Patches</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="saveBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+          Save
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ─── TOASTS ─── -->
+<div class="toast-shelf" id="toastShelf"></div>
+
+<script>
+'use strict';
+
+/* ── IndexedDB ── */
+const IDB = (() => {
+  const DB = 'TaskBucketsDB', VER = 1, ST = 'tiles';
+  let _db;
+
+  function open() {
+    return new Promise((ok, fail) => {
+      const req = indexedDB.open(DB, VER);
+      req.onupgradeneeded = e => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains(ST)) {
+          d.createObjectStore(ST, { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = e => { _db = e.target.result; ok(); };
+      req.onerror  = e => fail(e.target.error);
+    });
+  }
+
+  function tx(mode) { return _db.transaction(ST, mode).objectStore(ST); }
+
+  const getAll  = () => new Promise((ok, fail) => { const r = tx('readonly').getAll(); r.onsuccess=()=>ok(r.result); r.onerror=()=>fail(r.error); });
+  const put     = t  => new Promise((ok, fail) => { const r = tx('readwrite').put(t);  r.onsuccess=()=>ok();        r.onerror=()=>fail(r.error); });
+  const remove  = id => new Promise((ok, fail) => { const r = tx('readwrite').delete(id); r.onsuccess=()=>ok();     r.onerror=()=>fail(r.error); });
+
+  return { open, getAll, put, remove };
+})();
+
+/* ── State ── */
+const BUCKETS = [
+  {
+    id:'development', label:'Development',
+    icon:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--dev2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>`,
+    color:'var(--dev2)',
+  },
+  {
+    id:'bugs', label:'Bugs',
+    icon:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--bug2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2l1.5 1.5"/><path d="M14.5 3.5L16 2"/><path d="M9 7.5A5 5 0 0 0 4 12v3a8 8 0 0 0 16 0v-3a5 5 0 0 0-5-4.5H9z"/><path d="M3 13h4"/><path d="M17 13h4"/><path d="M12 19v4"/><path d="M8 9.5V7"/><path d="M16 9.5V7"/></svg>`,
+    color:'var(--bug2)',
+  },
+  {
+    id:'patches', label:'Patches',
+    icon:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--patch2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22C6.5 22 2 17.5 2 12S6.5 2 12 2s10 4.5 10 10-4.5 10-10 10z"/><path d="M8 12l2.5 2.5L16 9"/></svg>`,
+    color:'var(--patch2)',
+  },
+];
+
+let tiles = { development:[], bugs:[], patches:[] };
+let drag  = null;  // { id, fromBucket }
+let editId = null;
+
+/* ── Render board ── */
+function renderBoard() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  BUCKETS.forEach(b => board.appendChild(buildBucket(b)));
+  updateStats();
+  applyActiveTab();
+}
+
+function buildBucket(b) {
+  const list = tiles[b.id] || [];
+  const wrap = document.createElement('div');
+  wrap.className = 'bucket';
+  wrap.dataset.type = b.id;
+
+  /* header */
+  const header = document.createElement('div');
+  header.className = 'bucket-header';
+  header.innerHTML = `
+    <div class="bh-left">
+      <div class="bucket-icon-wrap">${b.icon}</div>
+      <span class="bucket-name">${b.label}</span>
+    </div>
+    <span class="bucket-count" id="count-${b.id}">${list.length}</span>
+  `;
+  wrap.appendChild(header);
+
+  /* accent line */
+  const accent = document.createElement('div');
+  accent.className = 'bucket-accent';
+  wrap.appendChild(accent);
+
+  /* tile list */
+  const ul = document.createElement('div');
+  ul.className = 'tiles-list';
+  ul.id = 'list-' + b.id;
+
+  if (list.length === 0) {
+    ul.appendChild(emptyState());
+  } else {
+    list.forEach(t => ul.appendChild(buildTile(t, b)));
+  }
+
+  bindListDnD(ul, b.id);
+  wrap.appendChild(ul);
+
+  /* add button */
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn-add-tile';
+  addBtn.innerHTML = `
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+    Add tile
+  `;
+  addBtn.addEventListener('click', () => openModal(null, b.id));
+  wrap.appendChild(addBtn);
+
+  return wrap;
+}
+
+function emptyState() {
+  const d = document.createElement('div');
+  d.className = 'empty-state';
+  d.innerHTML = `
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+      <rect x="3" y="3" width="18" height="18" rx="3"/>
+      <path d="M9 12h6M12 9v6"/>
+    </svg>
+    <span>No tiles yet.<br>Click <strong>Add tile</strong> below.</span>
+  `;
+  return d;
+}
+
+function buildTile(t, b) {
+  const el = document.createElement('div');
+  el.className = 'tile';
+  el.draggable = true;
+  el.dataset.id = t.id;
+  el.dataset.bucket = b.id;
+
+  let shortUrl = t.url;
+  try {
+    const u = new URL(t.url);
+    shortUrl = u.hostname + (u.pathname.length > 1
+      ? u.pathname.slice(0, 28) + (u.pathname.length > 28 ? '…' : '')
+      : '');
+  } catch {}
+
+  if (t.flagged) el.classList.add('flagged');
+
+  el.innerHTML = `
+    <div class="tile-body">
+      <div class="tile-drag-handle" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="9" cy="5" r="1.2" fill="currentColor" stroke="none"/>
+          <circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none"/>
+          <circle cx="9" cy="19" r="1.2" fill="currentColor" stroke="none"/>
+          <circle cx="15" cy="5" r="1.2" fill="currentColor" stroke="none"/>
+          <circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none"/>
+          <circle cx="15" cy="19" r="1.2" fill="currentColor" stroke="none"/>
+        </svg>
+      </div>
+      <div class="tile-content">
+        <div class="tile-title-row">
+          <a class="tile-link" href="${esc(t.url)}" target="_blank" rel="noopener noreferrer">${esc(t.title)}</a>
+          <span class="tile-flag-badge"><span class="badge-dot"></span>Working</span>
+          <div class="tile-actions">
+            <button class="btn-icon flag" data-act="flag" data-id="${t.id}" title="Mark as working">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="${t.flagged ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+            </button>
+            <button class="btn-icon" data-act="edit" data-id="${t.id}" title="Edit">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="btn-icon del" data-act="delete" data-id="${t.id}" title="Delete">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="tile-url">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          ${esc(shortUrl)}
+        </div>
+        ${t.desc ? `<div class="tile-desc">${esc(t.desc)}</div>` : ''}
+      </div>
+    </div>
+  `;
+
+  /* tile drag events */
+  el.addEventListener('dragstart', e => {
+    drag = { id: t.id, fromBucket: b.id };
+    el.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', t.id);
+    /* hide link click during drag */
+  });
+  el.addEventListener('dragend', () => {
+    el.classList.remove('dragging');
+    drag = null;
+    document.querySelectorAll('.drop-line').forEach(l => l.remove());
+    document.querySelectorAll('.bucket.drag-active').forEach(b => b.classList.remove('drag-active'));
+  });
+
+  /* action buttons */
+  el.addEventListener('click', e => {
+    const btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    e.stopPropagation();
+    if (btn.dataset.act === 'flag')   toggleFlag(btn.dataset.id, el);
+    if (btn.dataset.act === 'edit')   openModal(btn.dataset.id);
+    if (btn.dataset.act === 'delete') inlineDeleteConfirm(btn.dataset.id, el);
+  });
+
+  /* prevent link firing on drag */
+  el.querySelector('.tile-link').addEventListener('mousedown', () => { el.draggable = true; });
+
+  return el;
+}
+
+/* ── Drag & Drop on lists ── */
+function bindListDnD(list, bucketId) {
+  list.addEventListener('dragover', e => {
+    if (!drag) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    const bucket = list.closest('.bucket');
+    bucket.classList.add('drag-active');
+
+    list.querySelectorAll('.drop-line').forEach(l => l.remove());
+
+    const after = dragAfterEl(list, e.clientY);
+    const line = document.createElement('div');
+    line.className = 'drop-line';
+    if (!after) list.appendChild(line);
+    else list.insertBefore(line, after);
+  });
+
+  list.addEventListener('dragleave', e => {
+    if (!list.contains(e.relatedTarget)) {
+      list.querySelectorAll('.drop-line').forEach(l => l.remove());
+      list.closest('.bucket').classList.remove('drag-active');
+    }
+  });
+
+  list.addEventListener('drop', async e => {
+    e.preventDefault();
+    if (!drag || drag.fromBucket !== bucketId) return; /* same-bucket only */
+
+    list.querySelectorAll('.drop-line').forEach(l => l.remove());
+    list.closest('.bucket').classList.remove('drag-active');
+
+    const arr = tiles[bucketId];
+    const fromIdx = arr.findIndex(t => t.id === drag.id);
+    if (fromIdx === -1) return;
+
+    const afterEl = dragAfterEl(list, e.clientY);
+    let toIdx;
+    if (!afterEl) {
+      toIdx = arr.length - 1;
+    } else {
+      const afterId = afterEl.dataset.id;
+      toIdx = arr.findIndex(t => t.id === afterId);
+      if (toIdx > fromIdx) toIdx--;
+    }
+    if (toIdx < 0) toIdx = 0;
+    if (fromIdx === toIdx) return;
+
+    const [moved] = arr.splice(fromIdx, 1);
+    arr.splice(toIdx, 0, moved);
+
+    arr.forEach((t, i) => { t.order = i; });
+    await Promise.all(arr.map(t => IDB.put(t)));
+    renderBoard();
+  });
+}
+
+function dragAfterEl(list, y) {
+  const els = [...list.querySelectorAll('.tile:not(.dragging)')];
+  return els.reduce((closest, el) => {
+    const box = el.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    return (offset < 0 && offset > closest.offset) ? { offset, el } : closest;
+  }, { offset: -Infinity, el: null }).el;
+}
+
+/* ── Flag / Working toggle ── */
+async function toggleFlag(id, tileEl) {
+  let found;
+  for (const b of Object.keys(tiles)) {
+    found = tiles[b].find(t => t.id === id);
+    if (found) break;
+  }
+  if (!found) return;
+  found.flagged = !found.flagged;
+  await IDB.put(found);
+  tileEl.classList.toggle('flagged', found.flagged);
+  const flagSvg = tileEl.querySelector('.btn-icon.flag svg');
+  if (flagSvg) flagSvg.setAttribute('fill', found.flagged ? 'currentColor' : 'none');
+}
+
+/* ── Inline delete confirm ── */
+function inlineDeleteConfirm(id, tileEl) {
+  const body = tileEl.querySelector('.tile-body');
+  const orig = body.innerHTML;
+  body.innerHTML = `
+    <div class="delete-confirm">
+      <div class="delete-confirm-msg">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Delete this tile?
+      </div>
+      <button class="btn-confirm-n" id="dcNo-${id}">No</button>
+      <button class="btn-confirm-y" id="dcYes-${id}">Yes</button>
+    </div>
+  `;
+
+  document.getElementById(`dcYes-${id}`).onclick = async () => {
+    for (const b of Object.keys(tiles)) {
+      const idx = tiles[b].findIndex(t => t.id === id);
+      if (idx !== -1) { tiles[b].splice(idx, 1); break; }
+    }
+    await IDB.remove(id);
+    toast('Tile deleted', 'ok');
+    renderBoard();
+  };
+  document.getElementById(`dcNo-${id}`).onclick = () => {
+    body.innerHTML = orig;
+    tileEl.draggable = true;
+    /* re-bind actions after innerHTML restore */
+    body.addEventListener('click', e => {
+      const btn = e.target.closest('[data-act]');
+      if (!btn) return;
+      e.stopPropagation();
+      if (btn.dataset.act === 'edit')   openModal(btn.dataset.id);
+      if (btn.dataset.act === 'delete') inlineDeleteConfirm(btn.dataset.id, tileEl);
+    }, { once: true });
+  };
+}
+
+/* ── Modal ── */
+const overlay  = document.getElementById('overlay');
+const tileForm = document.getElementById('tileForm');
+
+function openModal(id, defaultBucket) {
+  editId = id || null;
+  const heading  = document.getElementById('mHeading');
+  const iconEl   = document.getElementById('mIcon');
+
+  if (id) {
+    heading.textContent = 'Edit Tile';
+    iconEl.innerHTML = '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>';
+    iconEl.setAttribute('stroke', 'var(--dev2)');
+
+    let found;
+    for (const b of Object.keys(tiles)) {
+      found = tiles[b].find(t => t.id === id);
+      if (found) break;
+    }
+    if (found) {
+      document.getElementById('fTitle').value  = found.title;
+      document.getElementById('fUrl').value    = found.url;
+      document.getElementById('fDesc').value   = found.desc || '';
+      document.getElementById('fBucket').value = found.bucket;
+    }
+  } else {
+    heading.textContent = 'Add Tile';
+    iconEl.innerHTML = '<path d="M12 5v14M5 12h14"/>';
+    iconEl.setAttribute('stroke', 'var(--dev2)');
+    tileForm.reset();
+    if (defaultBucket) document.getElementById('fBucket').value = defaultBucket;
+  }
+
+  overlay.classList.add('open');
+  setTimeout(() => document.getElementById('fTitle').focus(), 60);
+}
+
+function closeModal() {
+  overlay.classList.remove('open');
+  editId = null;
+}
+
+document.getElementById('closeBtn').addEventListener('click', closeModal);
+document.getElementById('cancelBtn').addEventListener('click', closeModal);
+overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+tileForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const title  = document.getElementById('fTitle').value.trim();
+  const url    = document.getElementById('fUrl').value.trim();
+  const desc   = document.getElementById('fDesc').value.trim();
+  const bucket = document.getElementById('fBucket').value;
+
+  if (!title || !url) { toast('Title and URL are required', 'err'); return; }
+
+  if (editId) {
+    let oldBucket, found;
+    for (const b of Object.keys(tiles)) {
+      const idx = tiles[b].findIndex(t => t.id === editId);
+      if (idx !== -1) { oldBucket = b; found = tiles[b][idx]; break; }
+    }
+    if (!found) return;
+
+    found.title = title;
+    found.url   = url;
+    found.desc  = desc;
+
+    if (bucket !== oldBucket) {
+      const idx = tiles[oldBucket].indexOf(found);
+      tiles[oldBucket].splice(idx, 1);
+      found.bucket = bucket;
+      found.order  = (tiles[bucket] || []).length;
+      tiles[bucket].push(found);
+      tiles[oldBucket].forEach((t, i) => t.order = i);
+      await Promise.all(tiles[oldBucket].map(t => IDB.put(t)));
+    } else {
+      found.bucket = bucket;
+    }
+
+    await IDB.put(found);
+    toast('Tile updated', 'ok');
+  } else {
+    const id   = 'tile_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+    const tile = { id, title, url, desc, bucket, order: (tiles[bucket] || []).length, createdAt: Date.now() };
+    tiles[bucket] = tiles[bucket] || [];
+    tiles[bucket].push(tile);
+    await IDB.put(tile);
+    toast('Tile created', 'ok');
+  }
+
+  closeModal();
+  renderBoard();
+});
+
+/* ── Stats ── */
+function updateStats() {
+  const dc = (tiles.development||[]).length;
+  const bc = (tiles.bugs||[]).length;
+  const pc = (tiles.patches||[]).length;
+  document.getElementById('statDev').textContent   = `${dc} dev`;
+  document.getElementById('statBug').textContent   = `${bc} bug${bc !== 1 ? 's' : ''}`;
+  document.getElementById('statPatch').textContent = `${pc} patch${pc !== 1 ? 'es' : ''}`;
+  const tc = document.getElementById('tabCount-development');
+  const tb = document.getElementById('tabCount-bugs');
+  const tp = document.getElementById('tabCount-patches');
+  if (tc) tc.textContent = dc;
+  if (tb) tb.textContent = bc;
+  if (tp) tp.textContent = pc;
+}
+
+/* ── Toast ── */
+function toast(msg, type) {
+  const shelf = document.getElementById('toastShelf');
+  const el    = document.createElement('div');
+  el.className = `toast ${type}`;
+  const icon  = type === 'ok'
+    ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--patch2)" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>`
+    : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--bug2)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>`;
+  el.innerHTML = icon + esc(msg);
+  shelf.appendChild(el);
+  setTimeout(() => el.remove(), 3100);
+}
+
+/* ── Helpers ── */
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+/* ── Seed demo data ── */
+async function seedDemo() {
+  const demo = [
+    { bucket:'development', title:'OAuth 2.0 Integration',     url:'https://github.com',              desc:'Implement Google & GitHub SSO for the dashboard' },
+    { bucket:'development', title:'REST API v3 Refactor',      url:'https://github.com',              desc:'Migrate endpoints to OpenAPI 3.1 spec' },
+    { bucket:'development', title:'Dark Mode Support',         url:'https://github.com',              desc:'CSS variable–based theme toggle' },
+    { bucket:'bugs',        title:'Session Timeout Race',      url:'https://jira.example.com',        desc:'Users intermittently logged out after 2 min idle' },
+    { bucket:'bugs',        title:'Null Pointer on Empty Save',url:'https://jira.example.com',        desc:'Crashes when required field is blank on submit' },
+    { bucket:'patches',     title:'CVE-2025-1234 Security Fix',url:'https://nvd.nist.gov',            desc:'Patch XSS vector in markdown renderer' },
+    { bucket:'patches',     title:'v3.2.1 Dependency Update',  url:'https://github.com/releases',     desc:'Bump lodash, axios, and date-fns' },
+  ];
+
+  for (let i = 0; i < demo.length; i++) {
+    const d = demo[i];
+    const tile = { id:'demo_' + i, title:d.title, url:d.url, desc:d.desc, bucket:d.bucket, order:tiles[d.bucket].length, createdAt:Date.now() };
+    tiles[d.bucket].push(tile);
+    await IDB.put(tile);
+  }
+}
+
+/* ── Mobile Tabs ── */
+let activeTab = 'development';
+
+function applyActiveTab() {
+  if (window.innerWidth > 600) {
+    document.querySelectorAll('.bucket').forEach(b => b.classList.add('tab-active'));
+    return;
+  }
+  document.querySelectorAll('.bucket').forEach(b => {
+    b.classList.toggle('tab-active', b.dataset.type === activeTab);
+  });
+  document.querySelectorAll('.mobile-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === activeTab);
+  });
+}
+
+document.getElementById('mobileTabs').addEventListener('click', e => {
+  const tab = e.target.closest('.mobile-tab');
+  if (!tab) return;
+  activeTab = tab.dataset.tab;
+  applyActiveTab();
+});
+
+window.addEventListener('resize', applyActiveTab);
+
+/* ── Boot ── */
+IDB.open().then(async () => {
+  const all = await IDB.getAll();
+  tiles = { development:[], bugs:[], patches:[] };
+
+  for (const t of all) {
+    if (!tiles[t.bucket]) tiles[t.bucket] = [];
+    tiles[t.bucket].push(t);
+  }
+  for (const b of Object.keys(tiles)) {
+    tiles[b].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }
+
+  if (all.length === 0) await seedDemo();
+
+  renderBoard();
+}).catch(err => {
+  console.error('IndexedDB failed:', err);
+  tiles = { development:[], bugs:[], patches:[] };
+  toast('Storage unavailable — data will not persist', 'err');
+  renderBoard();
+});
+</script>
+</body>
+</html>
