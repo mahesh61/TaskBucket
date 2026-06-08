@@ -1091,25 +1091,6 @@ function esc(s) {
     .replace(/"/g,'&quot;');
 }
 
-/* ── Seed demo data ── */
-async function seedDemo() {
-  const demo = [
-    { bucket:'development', title:'OAuth 2.0 Integration',     url:'https://github.com',              desc:'Implement Google & GitHub SSO for the dashboard' },
-    { bucket:'development', title:'REST API v3 Refactor',      url:'https://github.com',              desc:'Migrate endpoints to OpenAPI 3.1 spec' },
-    { bucket:'development', title:'Dark Mode Support',         url:'https://github.com',              desc:'CSS variable–based theme toggle' },
-    { bucket:'bugs',        title:'Session Timeout Race',      url:'https://jira.example.com',        desc:'Users intermittently logged out after 2 min idle' },
-    { bucket:'bugs',        title:'Null Pointer on Empty Save',url:'https://jira.example.com',        desc:'Crashes when required field is blank on submit' },
-    { bucket:'patches',     title:'CVE-2025-1234 Security Fix',url:'https://nvd.nist.gov',            desc:'Patch XSS vector in markdown renderer' },
-    { bucket:'patches',     title:'v3.2.1 Dependency Update',  url:'https://github.com/releases',     desc:'Bump lodash, axios, and date-fns' },
-  ];
-
-  for (let i = 0; i < demo.length; i++) {
-    const d = demo[i];
-    const tile = { id:'demo_' + i, title:d.title, url:d.url, desc:d.desc, bucket:d.bucket, order:tiles[d.bucket].length, createdAt:Date.now() };
-    tiles[d.bucket].push(tile);
-    await IDB.put(tile);
-  }
-}
 
 /* ── Mobile Tabs ── */
 let activeTab = 'development';
@@ -1148,8 +1129,6 @@ IDB.open().then(async () => {
   for (const b of Object.keys(tiles)) {
     tiles[b].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }
-
-  if (all.length === 0) await seedDemo();
 
   renderBoard();
 }).catch(err => {
